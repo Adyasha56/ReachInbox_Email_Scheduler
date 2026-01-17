@@ -15,16 +15,21 @@ model User {
   batches   EmailBatch[]
   createdAt DateTime     @default(now())
 }
-
 model EmailBatch {
-  id        String   @id @default(cuid())
-  name      String
-  status    String
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  emails    Email[]
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  status       String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  startTime    DateTime
+  delayBetween Int
+  hourlyLimit  Int
+
+  emails       Email[]
+  createdAt    DateTime @default(now())
 }
+
 
 model Email {
   id        String     @id @default(cuid())

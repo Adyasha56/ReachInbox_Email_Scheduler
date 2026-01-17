@@ -4,11 +4,11 @@ import { prisma } from "@/lib/prisma";
 export async function POST(req: Request) {
   const body = await req.json();
 
-  const { name, userId } = body;
+  const { name, userId, startTime, delayBetween, hourlyLimit } = body;
 
-  if (!name || !userId) {
+  if (!name || !userId || !startTime || delayBetween == null || hourlyLimit == null) {
     return NextResponse.json(
-      { error: "Missing fields" },
+      { error: "Missing required fields" },
       { status: 400 }
     );
   }
@@ -16,8 +16,11 @@ export async function POST(req: Request) {
   const batch = await prisma.emailBatch.create({
     data: {
       name,
-      status: "draft",
+      status: "scheduled",
       userId,
+      startTime: new Date(startTime), 
+      delayBetween: Number(delayBetween),
+      hourlyLimit: Number(hourlyLimit),
     },
   });
 
