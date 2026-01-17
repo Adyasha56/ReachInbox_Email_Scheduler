@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String       @id @default(cuid())
+  googleId  String       @unique
+  name      String
+  email     String       @unique
+  avatar    String
+  batches   EmailBatch[]
+  createdAt DateTime     @default(now())
+}
+
+model EmailBatch {
+  id           String   @id @default(cuid())
+  userId       String
+  subject      String
+  body         String
+  startTime    DateTime
+  delayBetween Int
+  hourlyLimit  Int
+  status       String
+  emails       Email[]
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Email {
+  id          String    @id @default(cuid())
+  batchId     String
+  toEmail     String
+  scheduledAt DateTime
+  sentAt      DateTime?
+  status      String
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  batch EmailBatch @relation(fields: [batchId], references: [id])
+}
