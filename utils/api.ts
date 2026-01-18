@@ -1,10 +1,6 @@
 import axios from "axios";
 
-/**
- * Since frontend & backend both are Next.js
- * and auth is cookie-based (NextAuth),
- * we MUST enable credentials.
- */
+
 const api = axios.create({
   baseURL: "http://localhost:3000",
   withCredentials: true,
@@ -65,6 +61,8 @@ export const batchAPI = {
     delayBetween: number;
     hourlyLimit: number;
   }) => api.post("/api/batch/create", data),
+
+  list: () => api.get("/api/batch/list"),
 };
 
 /* =========================
@@ -81,6 +79,21 @@ export const emailAPI = {
     subject: string;
     bodyText: string;
   }) => api.post("/api/email/add", data),
+
+  getScheduled: () => api.get("/api/email/scheduled"),
+  getSent: () => api.get("/api/email/sent"),
 };
+
+// export const emailAPI = {
+//   add: (data) => api.post("/api/email/add", data),
+//   getScheduled: () => api.get("/api/email/scheduled"),
+//   getSent: () => api.get("/api/email/sent"),
+// };
+
+// export const batchAPI = {
+//   create: (data) => api.post("/api/batch/create", data),
+//   list: () => api.get("/api/batch/list"),
+// };
+
 
 export default api;
