@@ -14,7 +14,7 @@ export const authOptions: NextAuthOptions = {
   ],
 
   session: {
-    strategy: "jwt", // ✅ THIS is the fix
+    strategy: "jwt",
   },
 
   secret: process.env.NEXTAUTH_SECRET,
