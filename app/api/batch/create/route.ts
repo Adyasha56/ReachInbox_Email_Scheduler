@@ -42,13 +42,19 @@ export async function POST(req: Request) {
   });
 
   //Schedule job
-  await emailQueue.add(
-    "process-batch",
-    { batchId: batch.id },
-    {
-      delay: new Date(startTime).getTime() - Date.now(),
-    }
-  );
+ await emailQueue.add(
+  "process-batch",
+  { batchId: batch.id },
+  {
+    delay: new Date(startTime).getTime() - Date.now(),
+    attempts: 24, // retry for next 24 hours
+    backoff: {
+      type: "fixed",
+      delay: 60 * 60 * 1000, // 1 hour
+    },
+  }
+);
+
 
   return NextResponse.json(batch);
 }
