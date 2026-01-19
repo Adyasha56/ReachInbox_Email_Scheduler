@@ -21,6 +21,7 @@ export interface Email {
   batchId: string;
   to: string;
   subject: string;
+  bodyText?: string; 
   body: string;
   status: "pending" | "sent" | "failed";
   createdAt: string;

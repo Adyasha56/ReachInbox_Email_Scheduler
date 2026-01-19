@@ -41,11 +41,11 @@ export default function DashboardLayout({
 
       fetchCounts();
       
-      // Refresh counts every 30 seconds
-      const interval = setInterval(fetchCounts, 30000);
+      // Refresh counts every 5 mins
+      const interval = setInterval(fetchCounts, 300000);
       return () => clearInterval(interval);
     }
-  }, [status, router]);
+  }, [status]);
 
   if (status === "loading" || !session) {
     return (

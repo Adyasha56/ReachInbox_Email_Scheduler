@@ -24,6 +24,7 @@ export async function GET() {
       id: true,
       to: true,
       subject: true,
+      body: true,
       status: true,
       createdAt: true,
       batch: {
@@ -33,6 +34,8 @@ export async function GET() {
       },
     },
   });
+
+console.log("----------------------");
 
   return NextResponse.json(emails);
 }

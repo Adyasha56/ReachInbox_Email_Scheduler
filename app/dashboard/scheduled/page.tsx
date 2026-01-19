@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { ScheduledEmailsTable } from "@/components/emails/scheduled-emails-table";
 import { emailAPI } from "@/utils/api";
 import { Email } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { ComposeEmailDialog } from "@/components/emails/compose-email-dialog";
-import { EmailSearch } from "@/components/emails/email-search";
 import { useRouter } from "next/navigation";
 
-export default function DashboardPage() {
+export default function ScheduledPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [emails, setEmails] = useState<Email[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!session) {
@@ -25,6 +23,10 @@ export default function DashboardPage() {
     }
 
     fetchScheduledEmails();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchScheduledEmails, 300000);
+    return () => clearInterval(interval);
   }, [session]);
 
   const fetchScheduledEmails = async () => {
@@ -39,22 +41,20 @@ export default function DashboardPage() {
     }
   };
 
-  const filteredEmails = useMemo(() => {
-    if (!searchQuery.trim()) return emails;
-    
-    const query = searchQuery.toLowerCase();
-    return emails.filter(
-      (email) =>
-        email.to.toLowerCase().includes(query) ||
-        email.subject.toLowerCase().includes(query)
-    );
-  }, [emails, searchQuery]);
-
   return (
     <div className="space-y-6">
-      {/* <EmailSearch onSearch={setSearchQuery} placeholder="Search emails..." /> */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Scheduled Emails</h1>
+        {/* <Button onClick={() => setIsComposeOpen(true)}>
+          Compose Email
+        </Button> */}
+      </div>
 
-      <ScheduledEmailsTable emails={filteredEmails} isLoading={isLoading} />
+      <ScheduledEmailsTable 
+        emails={emails} 
+        isLoading={isLoading}
+        onRefresh={fetchScheduledEmails}
+      />
 
       <ComposeEmailDialog
         open={isComposeOpen}

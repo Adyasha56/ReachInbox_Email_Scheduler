@@ -27,7 +27,7 @@ export default function SentPage() {
     // Refresh every 30 seconds
     const interval = setInterval(fetchSentEmails, 30000);
     return () => clearInterval(interval);
-  }, [session, router]);
+  }, [session]);
 
   const fetchSentEmails = async () => {
     try {

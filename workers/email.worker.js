@@ -52,7 +52,8 @@ new Worker(
           from: "ReachInbox <no-reply@reachinbox.dev>",
           to: email.to,
           subject: email.subject,
-          text: email.body,
+          html: email.body,
+          text: email.body.replace(/<[^>]*>/g, ""),
         });
 
         console.log("Sent:", email.to);
