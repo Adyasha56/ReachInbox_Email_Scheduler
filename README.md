@@ -1,758 +1,646 @@
+# 📧 ReachInbox Email Scheduler
+
+A **production-grade email scheduling application** built with Next.js, BullMQ, Redis, and Prisma. Schedule, compose, and manage bulk email campaigns with rate limiting, delayed sending, and real-time tracking.
+
+![Next.js](https://img.shields.io/badge/Next.js-16.1.3-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)
+![Redis](https://img.shields.io/badge/Redis-5.0+-red?logo=redis)
+![Prisma](https://img.shields.io/badge/Prisma-5.22-2D3748?logo=prisma)
+![BullMQ](https://img.shields.io/badge/BullMQ-Job_Queue-orange)
 
 ---
 
-# ReachInbox Email Scheduler
+## ✨ Features Implemented
 
-## Overview
+### Backend Features
+| Feature | Description | Implementation |
+|---------|-------------|----------------|
+| 📅 **Email Scheduling** | Schedule emails for future delivery | BullMQ delayed jobs with configurable start time |
+| 💾 **Persistence** | Emails survive server restarts | Prisma + PostgreSQL/SQLite for data, Redis for job queue |
+| 🚦 **Rate Limiting** | Prevent SMTP throttling | Redis counters with hourly limits |
+| ⚡ **Concurrency Control** | Parallel email processing | Worker concurrency config |
+| 🔐 **Authentication** | Secure Google OAuth login | NextAuth with session management |
+| 📊 **Job Queue** | Reliable background processing | BullMQ with retry and backoff |
 
-A **production-grade email scheduling application** with a modern frontend and robust backend. Schedule, compose, and manage bulk email campaigns with rate limiting, delayed sending, and real-time tracking.
-
-The system allows authenticated users to:
-- Compose rich-text emails with formatting options
-- Schedule emails for future delivery
-- Set per-hour rate limits and delays between sends
-- View sent and scheduled emails
-- Track email status in real-time
-- Support multiple recipient emails
-
-> ✨ Full-stack application with React frontend + Next.js backend
-> 🔐 Secure Google OAuth authentication
-> 📨 BullMQ + Redis powered email scheduling
-> 🎨 Modern UI with Tailwind CSS + shadcn/ui
+### Frontend Features
+| Feature | Description |
+|---------|-------------|
+| 🔑 **Login Page** | Google OAuth authentication |
+| 📊 **Dashboard** | Overview with sidebar navigation |
+| ✏️ **Compose Email** | Rich text editor with TipTap |
+| 📋 **Scheduled Emails Table** | View pending emails with search |
+| ✅ **Sent Emails Table** | View sent emails with status |
+| 📄 **Email Detail View** | Full email content display |
+| 📁 **CSV/TXT Upload** | Bulk recipient import |
 
 ---
 
-## 🧠 System Architecture
+## 🏗️ System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     React Frontend                          │
-│  (Next.js 16 | Compose | Scheduled | Sent | Detail View)   │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       │ (Google OAuth)
-                       v
-┌─────────────────────────────────────────────────────────────┐
-│              Next.js API Routes (App Router)                │
-│                                                              │
-│  ├── /api/auth/* (NextAuth + Google)                       │
-│  ├── /api/batch/create, list                               │
-│  ├── /api/email/add, sent, scheduled                        │
-│  └── /api/health                                            │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-        ┌──────────────┼──────────────┐
-        │              │              │
-        v              v              v
-    Prisma ORM     BullMQ Queue    Redis Cache
-        │              │              │
-        v              v              v
-   SQLite DB      Delayed Jobs   Rate Limiting
-                       │
-                       v
-              ┌────────────────────┐
-              │  Worker Process    │
-              │  (email.worker.js) │
-              │                    │
-              │ ├─ Rate Limiting   │
-              │ ├─ Delay Logic     │
-              │ └─ SMTP Sender     │
-              └────────────────────┘
-                       │
-                       v
-              ┌────────────────────┐
-              │  Ethereal SMTP     │
-              │  (Email Service)   │
-              └────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                         CLIENT (Browser)                            │
+│                                                                     │
+│   ┌─────────┐  ┌─────────┐  ┌───────────┐  ┌─────────────────────┐ │
+│   │  Login  │  │ Compose │  │ Scheduled │  │   Sent Emails       │ │
+│   │  Page   │  │  Email  │  │   Table   │  │   Table + Detail    │ │
+│   └────┬────┘  └────┬────┘  └─────┬─────┘  └──────────┬──────────┘ │
+└────────┼────────────┼─────────────┼────────────────────┼────────────┘
+         │            │             │                    │
+         ▼            ▼             ▼                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    NEXT.JS API ROUTES (Backend)                     │
+│                                                                     │
+│   /api/auth/*          → NextAuth + Google OAuth                   │
+│   /api/batch/create    → Create email campaign batch               │
+│   /api/batch/list      → List all batches                          │
+│   /api/email/add       → Add email to batch                        │
+│   /api/email/sent      → Get sent emails                           │
+│   /api/email/scheduled → Get scheduled emails                      │
+│   /api/email/[id]      → Get email details                         │
+│   /api/health          → Health check endpoint                     │
+└────────────┬───────────────────────┬────────────────────────────────┘
+             │                       │
+             ▼                       ▼
+┌────────────────────────┐  ┌────────────────────────┐
+│     PRISMA ORM         │  │      BULLMQ QUEUE      │
+│                        │  │                        │
+│  • User management     │  │  • Delayed job         │
+│  • Email batches       │  │    scheduling          │
+│  • Email records       │  │  • Job persistence     │
+│  • Session storage     │  │  • Retry with backoff  │
+└───────────┬────────────┘  └───────────┬────────────┘
+            │                           │
+            ▼                           ▼
+┌────────────────────────┐  ┌────────────────────────┐
+│   PostgreSQL/SQLite    │  │        REDIS           │
+│                        │  │                        │
+│  • Persistent storage  │  │  • Job queue storage   │
+│  • User data           │  │  • Rate limit counters │
+│  • Email history       │  │  • Session cache       │
+└────────────────────────┘  └───────────┬────────────┘
+                                        │
+                                        ▼
+                           ┌────────────────────────┐
+                           │    WORKER PROCESS      │
+                           │  (email.worker.js)     │
+                           │                        │
+                           │  ┌──────────────────┐  │
+                           │  │ 1. Fetch pending │  │
+                           │  │    emails        │  │
+                           │  └────────┬─────────┘  │
+                           │           ▼            │
+                           │  ┌──────────────────┐  │
+                           │  │ 2. Check rate    │  │
+                           │  │    limit (Redis) │  │
+                           │  └────────┬─────────┘  │
+                           │           ▼            │
+                           │  ┌──────────────────┐  │
+                           │  │ 3. Send via SMTP │  │
+                           │  │    (Ethereal)    │  │
+                           │  └────────┬─────────┘  │
+                           │           ▼            │
+                           │  ┌──────────────────┐  │
+                           │  │ 4. Update status │  │
+                           │  │    in database   │  │
+                           │  └──────────────────┘  │
+                           └───────────┬────────────┘
+                                       ▼
+                           ┌────────────────────────┐
+                           │   ETHEREAL SMTP        │
+                           │   (Test Email Service) │
+                           │                        │
+                           │   • Fake SMTP server   │
+                           │   • Preview emails     │
+                           │   • No real delivery   │
+                           └────────────────────────┘
 ```
 
 ---
 
-## 🧰 Tech Stack
+## 🔄 How Scheduling Works
 
-### Frontend
-- **Framework:** Next.js 16.1.3 with App Router
-- **Language:** TypeScript
-- **UI Library:** React 19.2.3
-- **Styling:** Tailwind CSS 4
-- **Components:** shadcn/ui (Dialog, Button, Input, Badge, Table, etc.)
-- **Icons:** lucide-react
-- **Rich Text Editor:** TipTap (with formatting toolbar)
-- **Authentication:** NextAuth v4.24.13
-- **HTTP Client:** Axios
-- **Date Formatting:** date-fns
+### Email Scheduling Flow
 
-### Backend
-- **Runtime:** Node.js
-- **Framework:** Next.js API Routes
-- **Database:** Prisma ORM v5.22.0 (SQLite dev)
-- **Queue System:** BullMQ (Job scheduling)
-- **Cache:** Redis 5.0+
-- **Authentication:** NextAuth with Google OAuth
-- **Email:** Nodemailer + Ethereal SMTP
-- **Worker:** Separate Node.js process
+```
+User clicks "Send"
+        │
+        ▼
+┌─────────────────────────────────────┐
+│ 1. CREATE BATCH                     │
+│    POST /api/batch/create           │
+│    • Stores batch in database       │
+│    • Creates BullMQ delayed job     │
+│    • Job delay = startTime - now    │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│ 2. ADD EMAILS TO BATCH              │
+│    POST /api/email/add (per email)  │
+│    • Stores each email with         │
+│      status: "pending"              │
+│    • Links to batch via batchId     │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│ 3. JOB WAITS IN QUEUE               │
+│    BullMQ holds job until           │
+│    scheduled time                   │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼ (When time arrives)
+┌─────────────────────────────────────┐
+│ 4. WORKER PICKS UP JOB              │
+│    • Fetches pending emails         │
+│    • Processes each with delay      │
+│    • Updates status to "sent"       │
+└─────────────────────────────────────┘
+```
+
+### Persistence on Restart
+
+**Problem:** What happens if the server crashes?
+
+**Solution:**
+| Component | Persistence Mechanism |
+|-----------|----------------------|
+| Email Data | Stored in PostgreSQL/SQLite via Prisma |
+| Job Queue | Redis persists BullMQ jobs |
+| User Sessions | Database-backed sessions |
+
+**On Restart:**
+1. BullMQ reconnects to Redis
+2. Pending jobs resume automatically
+3. Worker continues processing from where it left off
+4. No emails are lost or duplicated
+
+### Rate Limiting Implementation
+
+```javascript
+// In email.worker.js
+const hourKey = `email_count:${batchId}:${new Date().getUTCHours()}`;
+
+// Increment counter
+const count = await redis.incr(hourKey);
+
+// Set expiry on first use
+if (count === 1) {
+  await redis.expire(hourKey, 3600); // 1 hour TTL
+}
+
+// Check limit
+if (count > HOURLY_LIMIT) {
+  await redis.decr(hourKey);
+  throw new Error("HOURLY_LIMIT_REACHED");
+  // BullMQ will retry after backoff
+}
+```
+
+**Rate Limit Config:**
+```env
+MAX_EMAILS_PER_HOUR=100   # Emails per hour per batch
+EMAIL_DELAY_MS=2000       # 2 second delay between sends
+```
+
+### Concurrency Control
+
+```javascript
+// Worker configuration
+new Worker("emailQueue", processor, {
+  concurrency: Number(process.env.WORKER_CONCURRENCY || 2),
+  connection: { host: "127.0.0.1", port: 6379 }
+});
+```
+
+- **concurrency: 2** = 2 emails processed in parallel
+- Prevents overwhelming SMTP server
+- Configurable via `WORKER_CONCURRENCY`
 
 ---
 
-## 🚀 Getting Started
+## 🚀 How to Run (Local Development)
 
 ### Prerequisites
-- Node.js 18+
-- Redis 5.0+ (Docker recommended)
-- Google OAuth credentials
 
-### Installation
+| Requirement | Version | Installation |
+|-------------|---------|--------------|
+| Node.js | 18+ | [nodejs.org](https://nodejs.org) |
+| Redis | 5.0+ | See below |
+| Git | Any | [git-scm.com](https://git-scm.com) |
 
-1. **Clone the repository**
-```bash
-git clone <repo-url>
-cd ReachInbox_Email_Scheduler
+---
+
+### Step 1: Install Redis Locally
+
+**Windows:**
+```powershell
+# Option 1: Using Chocolatey
+choco install redis-64
+
+# Option 2: Download from GitHub
+# https://github.com/microsoftarchive/redis/releases
+
+# Start Redis
+redis-server
 ```
 
-2. **Install dependencies**
+**macOS:**
 ```bash
+brew install redis
+brew services start redis
+```
+
+**Linux:**
+```bash
+sudo apt update
+sudo apt install redis-server
+sudo systemctl start redis
+```
+
+**Docker (All platforms):**
+```bash
+docker run -d -p 6379:6379 --name redis redis:latest
+```
+
+**Verify Redis is running:**
+```bash
+redis-cli ping
+# Should return: PONG
+```
+
+---
+
+### Step 2: Clone & Install
+
+```bash
+git clone https://github.com/Adyasha56/ReachInbox_Email_Scheduler.git
+cd ReachInbox_Email_Scheduler
 npm install
 ```
 
-3. **Setup environment variables** (`.env`)
+---
+
+### Step 3: Setup Ethereal Email (Test SMTP)
+
+1. Go to [https://ethereal.email](https://ethereal.email)
+2. Click **"Create Ethereal Account"**
+3. Copy the credentials:
+   - Email: `xxxx@ethereal.email`
+   - Password: `xxxxxxxxx`
+
+> **Note:** Ethereal is a fake SMTP service. Emails are NOT delivered to real inboxes. You can view sent emails via the preview URL in worker logs.
+
+---
+
+### Step 4: Setup Google OAuth
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new project or select existing
+3. Navigate to **APIs & Services** → **Credentials**
+4. Click **Create Credentials** → **OAuth Client ID**
+5. Application type: **Web application**
+6. Add **Authorized redirect URIs**:
+   ```
+   http://localhost:3000/api/auth/callback/google
+   ```
+7. Copy **Client ID** and **Client Secret**
+
+---
+
+### Step 5: Create Environment File
+
+Create `.env` file in project root:
+
 ```env
+# Database (Use Neon PostgreSQL or local SQLite)
+DATABASE_URL='postgresql://user:password@host/dbname?sslmode=require'
+# For SQLite (simpler): DATABASE_URL="file:./dev.db"
+
+# Redis (Local)
+REDIS_URL=redis://127.0.0.1:6379
+
 # NextAuth
 NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-key
+NEXTAUTH_SECRET=your-random-secret-key-at-least-32-chars
 
 # Google OAuth
-GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-client-secret
 
-# Database
-DATABASE_URL="file:./dev.db"
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# Email Service (Ethereal)
+# Ethereal Email (from Step 3)
 ETHEREAL_USER=your-ethereal-email@ethereal.email
 ETHEREAL_PASS=your-ethereal-password
 
 # Email Scheduling Config
-MAX_EMAILS_PER_HOUR=1
+MAX_EMAILS_PER_HOUR=100
 EMAIL_DELAY_MS=2000
 WORKER_CONCURRENCY=2
 ```
 
-4. **Setup database**
+**Generate NEXTAUTH_SECRET:**
 ```bash
+openssl rand -base64 32
+# Or use: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+---
+
+### Step 6: Setup Database
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Run migrations (creates tables)
 npx prisma migrate dev
 ```
 
-5. **Start Redis** (Docker)
-```bash
-docker run -d -p 6379:6379 redis:latest
-```
+---
 
-6. **Run development server**
+### Step 7: Run the Application
+
+You need **TWO terminals** running simultaneously:
+
+**Terminal 1: Start Next.js (Frontend + Backend API)**
 ```bash
 npm run dev
 ```
+Server runs at: `http://localhost:3000`
 
-7. **In a new terminal, start the email worker**
+**Terminal 2: Start Email Worker (BullMQ + Redis)**
 ```bash
-node workers/email.worker.js
-```
-
-8. **Open browser**
-```
-http://localhost:3000
+npm run worker
+# Or: node workers/email.worker.js
 ```
 
 ---
 
-## 📱 Frontend Features
+### Step 8: Test the Application
 
-### Dashboard Pages
-
-#### 1. **Compose Email** (`/dashboard/compose`)
-- Rich text editor with formatting toolbar (Bold, Italic, Strikethrough, Lists, Code, Quote)
-- Multiple email recipient support (manual input, comma/space/newline separated)
-- CSV/TXT file upload for batch email parsing
-- Subject and email content input
-- Scheduling options with preset times (Tomorrow, 10 AM, 11 AM, 3 PM)
-- Rate limiting and delay configuration
-- Toast notifications for user feedback
-- Form validation with specific error messages
-
-**Key Components:**
-- TipTap editor with `immediatelyRender: false` for SSR safety
-- Email chip display with "+X more" indicator
-- Send Later modal with preset time options
-- Paperclip and Clock icons in header for file attachment and scheduling
-
-#### 2. **Sent Emails** (`/dashboard/sent`)
-- Clean list view of all sent emails
-- Search and filter functionality
-- Recipient, status, subject, and date display
-- Click to view email details
-- Refresh button to sync latest data
-- Text size optimized (text-xs) for compact layout
-
-#### 3. **Email Detail** (`/dashboard/sent/[id]`)
-- Full email content display with HTML rendering
-- Sender information with avatar
-- Timestamp and metadata
-- Back navigation button
-- Action buttons (Star, Archive, Delete placeholders)
-- Dynamic routing based on email ID
-
-#### 4. **Scheduled Emails** (`/dashboard/scheduled`)
-- Same list view as sent emails
-- Yellow "Pending" status badge
-- Search and filter for scheduled emails
-- Click to view scheduled email details
-- Auto-refresh every 30 seconds
-
-### UI/UX Features
-- **Toast Notifications:** All errors and confirmations via toasts (3-second auto-dismiss)
-- **Icons:** Lucide React icons throughout (Mail, Clock, Paperclip, Filter, etc.)
-- **Responsive Design:** Mobile-friendly with Tailwind CSS
-- **Loading States:** Spinners and loading text for async operations
-- **Empty States:** Helpful empty state messages with icons
+1. Open `http://localhost:3000` in browser
+2. Click **"Login with Google"**
+3. Go to **Compose** page
+4. Add recipient emails, subject, and body
+5. Set schedule time (1-2 minutes from now)
+6. Click **"Send"**
+7. Watch Terminal 2 (worker) for:
+   ```
+   📦 Processing batch: cmxxxxxx
+   Sent: recipient@email.com
+   Preview: https://ethereal.email/message/xxxxx
+   Batch finished: cmxxxxxx
+   ```
+8. Click the **Preview URL** to see the email in Ethereal
+9. Check **Sent** tab - email shows with "sent" status
 
 ---
 
-## 🔐 Authentication
+## 📁 Project Structure
 
-### Google OAuth Flow
-1. User clicks "Login with Google"
-2. NextAuth handles OAuth redirect
-3. Backend validates token with Google
-4. Creates session in database via PrismaAdapter
-5. Frontend receives session cookie (HTTP-only)
-6. User logged in securely
-
-### Session Management
-- Sessions stored in database (Prisma)
-- HTTP-only cookies prevent XSS attacks
-- Frontend calls `useSession()` hook to get user info
-- Automatic redirect to login if session expires
-
-**Auth Endpoints:**
 ```
-POST   /api/auth/signin/google      # Google login
-GET    /api/auth/session             # Get current session
-POST   /api/auth/signout             # Logout
+mail-scheduler/
+├── app/                          # Next.js App Router
+│   ├── api/                      # API Routes (Backend)
+│   │   ├── auth/[...nextauth]/   # NextAuth handlers
+│   │   ├── batch/                # Batch endpoints
+│   │   │   ├── create/route.ts   # Create campaign
+│   │   │   └── list/route.ts     # List batches
+│   │   ├── email/                # Email endpoints
+│   │   │   ├── add/route.js      # Add email to batch
+│   │   │   ├── sent/route.ts     # Get sent emails
+│   │   │   ├── scheduled/route.ts# Get pending emails
+│   │   │   └── [id]/route.ts     # Email details
+│   │   └── health/route.ts       # Health check
+│   ├── dashboard/                # Dashboard pages
+│   │   ├── compose/page.tsx      # Email composer
+│   │   ├── scheduled/page.tsx    # Scheduled emails table
+│   │   ├── sent/page.tsx         # Sent emails table
+│   │   └── layout.tsx            # Dashboard layout
+│   ├── layout.tsx                # Root layout
+│   └── page.tsx                  # Login page
+├── components/                   # React components
+│   ├── auth/login-form.tsx       # Login UI
+│   ├── emails/                   # Email components
+│   │   ├── compose-email-dialog.tsx
+│   │   ├── scheduled-emails-table.tsx
+│   │   └── sent-emails-table.tsx
+│   ├── layout/                   # Header, Sidebar
+│   └── ui/                       # shadcn/ui components
+├── lib/                          # Backend utilities
+│   ├── auth.ts                   # NextAuth config
+│   ├── prisma.ts                 # Prisma client (API)
+│   ├── prisma.js                 # Prisma client (Worker)
+│   ├── queue.ts                  # BullMQ queue
+│   ├── redis.ts                  # Redis client (API)
+│   └── redis.js                  # Redis client (Worker)
+├── workers/
+│   └── email.worker.js           # Background job processor
+├── prisma/
+│   └── schema.prisma             # Database schema
+└── .env                          # Environment variables
 ```
 
 ---
 
-## 📧 Email Scheduling & Sending
+## 🐛 Challenges Faced & Solutions
 
-### Workflow
+### Local Development Challenges
 
-1. **User Composes Email**
-   - Fills subject, body, recipients
-   - Selects scheduling time and rate limits
-   - Clicks "Send"
+| Challenge | Problem | Solution |
+|-----------|---------|----------|
+| **Redis Version Warning** | BullMQ recommends Redis 6.2+, Windows has 5.x | Works with warnings; use Docker for latest version |
+| **ES Module Warning** | Worker uses ES modules without `"type": "module"` | Warning only, doesn't affect functionality |
+| **TipTap SSR Hydration** | Rich text editor mismatch on hydration | Added `immediatelyRender: false` to editor config |
+| **OAuth Redirect Issues** | Login redirects to wrong URL | Ensure `NEXTAUTH_URL=http://localhost:3000` in .env |
+| **Prisma Connection Pool** | "Timed out fetching connection" error | Use singleton pattern, add connection cleanup |
 
-2. **Backend Creates Batch**
-   ```
-   POST /api/batch/create
-   {
-     "name": "Campaign Name",
-     "startTime": "2026-01-19T10:00:00Z",
-     "delayBetween": 2000,
-     "hourlyLimit": 1
-   }
-   ```
-   - Batch stored in database
-   - BullMQ job created with delay
+### Deployment Challenges (Vercel - Attempted)
 
-3. **Backend Adds Emails**
-   ```
-   POST /api/email/add
-   {
-     "batchId": "...",
-     "to": "user@example.com",
-     "subject": "...",
-     "bodyText": "..."
-   }
-   ```
-   - Each email stored with `status: "pending"`
+We attempted to deploy on Vercel but faced significant challenges:
 
-4. **Worker Processes Jobs**
-   - Runs on separate Node.js process
-   - Fetches pending emails
-   - Enforces rate limits (max emails per hour)
-   - Adds delay between sends
-   - Sends via Ethereal SMTP
-   - Updates status to `"sent"` or `"failed"`
+| Challenge | Problem | Why It Failed |
+|-----------|---------|---------------|
+| **No Background Workers** | Vercel is serverless, functions timeout after 10s | BullMQ workers need to run continuously |
+| **Redis Connection Type** | BullMQ needs TCP connection, Upstash provides REST | ioredis with TLS required for Upstash |
+| **ioredis Type Mismatch** | BullMQ's internal ioredis version differs | Use connection config object, not Redis instance |
+| **Cold Starts** | Serverless cold starts delay job processing | Not suitable for time-sensitive email scheduling |
+| **Prisma Connection Limits** | Serverless creates many connections | Connection pooling issues on free tier |
 
-5. **Frontend Displays**
-   - Scheduled tab shows pending emails
-   - Sent tab shows sent emails
-   - Real-time updates every 30 seconds
+### Why We Run Locally
 
-### Rate Limiting (Redis)
-- Tracks emails sent per hour per batch
-- Prevents exceeding `MAX_EMAILS_PER_HOUR`
-- Uses Redis counters with TTL
+After attempting Vercel deployment, we discovered:
 
-### Delay Logic
-- `EMAIL_DELAY_MS`: Milliseconds between sends (prevents SMTP rate limits)
-- `WORKER_CONCURRENCY`: Number of parallel email sends
+1. **Vercel is Serverless:**
+   - Functions timeout after 10 seconds (free tier)
+   - No persistent background workers
+   - Each request spawns new instance
+
+2. **BullMQ Requirements:**
+   - Needs persistent Redis TCP connection
+   - Workers must run continuously 24/7
+   - Not compatible with serverless architecture
+
+3. **For Production Deployment, Consider:**
+   - **Railway.app** - Supports workers + Redis
+   - **Render.com** - Background worker support
+   - **DigitalOcean App Platform** - Worker processes
+   - **AWS EC2 / Self-hosted** - Full control
 
 ---
 
-## 🛠️ API Endpoints
+## 📊 API Reference
+
+### Authentication
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/signin/google` | POST | Initiate Google login |
+| `/api/auth/session` | GET | Get current session |
+| `/api/auth/signout` | POST | Logout |
 
 ### Batch Management
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/api/batch/create` | Create email campaign batch |
-| GET | `/api/batch/list` | List all batches |
-
-**Example: Create Batch**
-```bash
-curl -X POST http://localhost:3000/api/batch/create \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Q1 Newsletter",
-    "startTime": "2026-01-20T10:00:00Z",
-    "delayBetween": 2000,
-    "hourlyLimit": 1
-  }'
-```
+| Endpoint | Method | Description | Body |
+|----------|--------|-------------|------|
+| `/api/batch/create` | POST | Create campaign | `{name, startTime, delayBetween, hourlyLimit}` |
+| `/api/batch/list` | GET | List batches | - |
 
 ### Email Management
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/api/email/add` | Add email to batch |
-| GET | `/api/email/sent` | Get sent emails |
-| GET | `/api/email/scheduled` | Get scheduled emails |
-| GET | `/api/email/:id` | Get email details |
-
-**Example: Add Email**
-```bash
-curl -X POST http://localhost:3000/api/email/add \
-  -H "Content-Type: application/json" \
-  -d '{
-    "batchId": "...",
-    "to": "user@example.com",
-    "subject": "Hello",
-    "bodyText": "<p>This is HTML content</p>"
-  }'
-```
+| Endpoint | Method | Description | Body |
+|----------|--------|-------------|------|
+| `/api/email/add` | POST | Add email to batch | `{batchId, to, subject, bodyText}` |
+| `/api/email/sent` | GET | Get sent emails | - |
+| `/api/email/scheduled` | GET | Get pending emails | - |
+| `/api/email/[id]` | GET | Get email detail | - |
 
 ---
 
-## 📊 Database Schema
+## 🔧 Environment Variables Reference
 
-### User
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `DATABASE_URL` | ✅ | Database connection | `file:./dev.db` or PostgreSQL URL |
+| `REDIS_URL` | ✅ | Redis connection | `redis://127.0.0.1:6379` |
+| `NEXTAUTH_URL` | ✅ | App base URL | `http://localhost:3000` |
+| `NEXTAUTH_SECRET` | ✅ | Session encryption | Random 32+ char string |
+| `GOOGLE_CLIENT_ID` | ✅ | OAuth client ID | From Google Console |
+| `GOOGLE_CLIENT_SECRET` | ✅ | OAuth secret | From Google Console |
+| `ETHEREAL_USER` | ✅ | Test SMTP email | `xxx@ethereal.email` |
+| `ETHEREAL_PASS` | ✅ | Test SMTP password | From Ethereal |
+| `MAX_EMAILS_PER_HOUR` | ❌ | Rate limit (default: 100) | `100` |
+| `EMAIL_DELAY_MS` | ❌ | Delay between sends | `2000` (2 seconds) |
+| `WORKER_CONCURRENCY` | ❌ | Parallel workers | `2` |
+
+---
+
+## 📝 Database Schema
+
 ```prisma
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String       @id @default(cuid())
+  email         String       @unique
   name          String?
   image         String?
   batches       EmailBatch[]
   sessions      Session[]
   accounts      Account[]
 }
-```
 
-### EmailBatch
-```prisma
 model EmailBatch {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   name         String
-  status       String    @default("scheduled")
+  status       String   @default("scheduled")
   userId       String
-  user         User      @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
   startTime    DateTime
   delayBetween Int
   hourlyLimit  Int
   emails       Email[]
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime @default(now())
 }
-```
 
-### Email
-```prisma
 model Email {
-  id        String    @id @default(cuid())
+  id        String     @id @default(cuid())
   batchId   String
   batch     EmailBatch @relation(fields: [batchId], references: [id])
+  from      String
   to        String
   subject   String
   body      String
-  status    String    @default("pending")
-  createdAt DateTime  @default(now())
+  status    String     @default("pending")
+  createdAt DateTime   @default(now())
 }
 ```
 
 ---
 
-## 🏃 Running the Application
+## 🧪 Testing Workflow
 
-### Development
+### Test Email Scheduling
 
-**Terminal 1: Start Next.js dev server**
-```bash
-npm run dev
-```
-Runs on `http://localhost:3000`
+1. **Start both servers** (dev + worker)
+2. **Login** with Google OAuth
+3. **Compose** an email with:
+   - Recipient: any valid email format
+   - Subject: Test subject
+   - Body: Some content
+   - Schedule: 1-2 minutes from now
+4. **Click Send**
+5. **Watch worker terminal:**
+   ```
+   📦 Processing batch: cmxxxxxx
+   Sent: test@example.com
+   Preview: https://ethereal.email/message/xxxxx
+   Batch finished: cmxxxxxx
+   ```
+6. **Click Preview URL** to view email in Ethereal
+7. **Check Sent tab** - status should be "sent"
 
-**Terminal 2: Start email worker**
-```bash
-node workers/email.worker.js
-```
-Processes scheduled emails continuously
+### Test Rate Limiting
 
-**Terminal 3 (optional): View Redis data**
-```bash
-redis-cli
-> KEYS *
-> GET key-name
-```
-
-### Production Build
-```bash
-npm run build
-npm run start
-```
-
-### Linting & Format
-```bash
-npm run lint
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Issue: Build fails with TypeScript errors
-```bash
-npm run build
-# Check output for file paths and line numbers
-```
-
-### Issue: Redis connection error
-```bash
-redis-cli ping
-# Should respond: PONG
-# If not, start Redis: docker run -d -p 6379:6379 redis:latest
-```
-
-### Issue: Emails not sending
-1. Check worker is running: `node workers/email.worker.js`
-2. Verify Redis is running: `redis-cli ping`
-3. Check `.env` has correct Ethereal credentials
-4. View worker logs for error messages
-
-### Issue: Login not working
-1. Verify Google OAuth credentials in `.env`
-2. Ensure `NEXTAUTH_SECRET` is set
-3. Check database has sessions table: `npx prisma migrate status`
-
----
-
-## 📝 Environment Variables Reference
-
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `NEXTAUTH_URL` | NextAuth callback URL | `http://localhost:3000` |
-| `NEXTAUTH_SECRET` | Session encryption key | `random-secret-key` |
-| `GOOGLE_CLIENT_ID` | OAuth client ID | From Google Console |
-| `GOOGLE_CLIENT_SECRET` | OAuth client secret | From Google Console |
-| `DATABASE_URL` | Prisma database URL | `file:./dev.db` |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
-| `ETHEREAL_USER` | Ethereal email address | `user@ethereal.email` |
-| `ETHEREAL_PASS` | Ethereal password | From ethereal.email |
-| `MAX_EMAILS_PER_HOUR` | Rate limit | `1` |
-| `EMAIL_DELAY_MS` | Delay between sends | `2000` |
-| `WORKER_CONCURRENCY` | Parallel sends | `2` |
+1. Set `MAX_EMAILS_PER_HOUR=2` in .env
+2. Restart worker
+3. Schedule 5 emails
+4. Worker will send 2, then pause
+5. After 1 hour (or reset), remaining emails process
 
 ---
 
 ## 🤝 Contributing
 
-When sharing changes:
-1. Create a patch file: `git diff > changes.patch`
-2. Share the patch file with collaborators
-3. They apply with: `git apply changes.patch`
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-MIT
-
-
-
-  * Delay between emails
-  * Hourly rate limit
+This project is licensed under the MIT License.
 
 ---
 
-## 🚦 Rate Limiting & Throttling
+## 👨‍💻 Author
 
-* Redis-backed counters track emails sent per hour
-* Configurable via environment variables
-* When hourly limit is exceeded:
+**Adyasha56**
 
-  * ❌ Emails are NOT dropped
-  * ❌ Job is NOT permanently failed
-  * ✅ Job is retried in the next hour window
+- GitHub: [@Adyasha56](https://github.com/Adyasha56)
+- Project: [ReachInbox Email Scheduler](https://github.com/Adyasha56/ReachInbox_Email_Scheduler)
 
 ---
 
-## 🔁 Restart Safety & Idempotency
-
-### Restart Safety
-
-* Delayed jobs live in Redis
-* Worker reconnects automatically
-* Future emails still send at correct time
-
-### Idempotency
-
-* Emails are processed only if `status = pending`
-* Sent emails are never reprocessed
-* Restarting worker does not cause duplicates
-
----
-
-## ⚙️ Environment Variables
-
-Create a `.env` file:
-
-```env
-DATABASE_URL="file:./dev.db"
-REDIS_URL="redis://localhost:6379"
-
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=supersecret
-
-GOOGLE_CLIENT_ID=xxxx
-GOOGLE_CLIENT_SECRET=xxxx
-
-ETHEREAL_USER=xxxx@ethereal.email
-ETHEREAL_PASS=xxxx
-
-MAX_EMAILS_PER_HOUR=100
-EMAIL_DELAY_MS=2000
-WORKER_CONCURRENCY=2
-```
-
----
-
-## 🧠 Redis Setup (Local)
-
-### Install Redis (Windows)
-
-1. Download Redis:
-
-```
-https://github.com/tporadowski/redis/releases
-```
-
-2. Install and run:
-
-```bash
-redis-server
-```
-
-Verify:
-
-```bash
-redis-cli ping
-# PONG
-```
-
----
-
-## 📧 Ethereal SMTP Setup
-
-Ethereal is a **fake SMTP service** used for testing.
-
-### Create account
-
-```bash
-node -e "require('nodemailer').createTestAccount().then(console.log)"
-```
-
-Add credentials to `.env`.
-
-### Email Preview
-
-After sending, worker logs:
-
-```
-Preview URL: https://ethereal.email/message/XXXX
-```
-
-Open URL to view email.
-
----
-
-## ▶️ Running the Project
-
-### Start Redis
-
-```bash
-redis-server
-```
-
-### Start Next.js backend
-
-```bash
-npm run dev
-```
-
-### Start worker (separate terminal)
-
-```bash
-npm run worker
-```
-
----
-
-## 📡 API Reference & Testing
-
-> ⚠️ All APIs require authentication
-> Use browser (cookies) for testing
-
----
-
-### 1️⃣ Create Email Batch (Campaign)
-
-```
-POST /api/batch/create
-```
-
-#### Request Body
-
-```json
-{
-  "name": "Test Campaign",
-  "startTime": "2026-01-20T11:10:00Z",
-  "delayBetween": 2,
-  "hourlyLimit": 100
-}
-```
-
-#### Response
-
-```json
-{
-  "id": "batch_id",
-  "status": "scheduled"
-}
-```
-
----
-
-### 2️⃣ Add Email to Batch
-
-```
-POST /api/email/add
-```
-
-#### Request Body
-
-```json
-{
-  "batchId": "batch_id",
-  "to": "test@example.com",
-  "subject": "Hello",
-  "bodyText": "This is a test email"
-}
-```
-
----
-
-### 3️⃣ Get Scheduled Emails (Dashboard)
-
-```
-GET /api/email/scheduled
-```
-
-Returns all pending emails for logged-in user.
-
----
-
-### 4️⃣ Get Sent Emails
-
-```
-GET /api/email/sent
-```
-
-Returns all sent emails.
-
----
-
-### 5️⃣ Get All Batches
-
-```
-GET /api/batch/list
-```
-
-Returns all campaigns for user.
-
----
-
-## 🧪 Testing Restart Safety
-
-1. Create a batch with start time 5 minutes later
-2. Stop backend + worker
-3. Restart everything
-4. Emails still send correctly
-
----
-
-## 🧪 Testing Rate Limit
-
-1. Set:
-
-```env
-MAX_EMAILS_PER_HOUR=1
-```
-
-2. Add 3 emails to batch
-
-Expected:
-
-* 1 email sent
-* Job retries next hour
-* Remaining emails sent later
-
----
-
-## What This System Does NOT Use
-
-* ❌ cron jobs
-* ❌ node-cron
-* ❌ agenda
-* ❌ in-memory schedulers
-
----
-
-## ✅ Requirement Compliance Summary
-
-| Requirement         | Status |
-| ------------------- | ------ |
-| BullMQ delayed jobs | ✅      |
-| No cron             | ✅      |
-| Restart safe        | ✅      |
-| No duplicate emails | ✅      |
-| Rate limiting       | ✅      |
-| Concurrency         | ✅      |
-| Ethereal SMTP       | ✅      |
-| Relational DB       | ✅      |
-
----
-
-## 🏁 Conclusion
-
-This backend demonstrates a **scalable, fault-tolerant email scheduling architecture** with proper rate limiting, authentication, and restart safety — closely matching real-world systems used by email platforms.
-
-
+## 🙏 Tech Stack & Acknowledgments
+
+| Technology | Purpose |
+|------------|---------|
+| [Next.js 16](https://nextjs.org) | React framework with App Router |
+| [BullMQ](https://docs.bullmq.io) | Redis-based job queue |
+| [Prisma](https://prisma.io) | Type-safe database ORM |
+| [Redis](https://redis.io) | In-memory data store |
+| [NextAuth](https://next-auth.js.org) | Authentication |
+| [shadcn/ui](https://ui.shadcn.com) | UI component library |
+| [TipTap](https://tiptap.dev) | Rich text editor |
+| [Ethereal](https://ethereal.email) | Fake SMTP for testing |
+| [Tailwind CSS](https://tailwindcss.com) | Utility-first CSS |
