@@ -1,9 +1,9 @@
 // lib/queue.ts
 import { Queue } from "bullmq";
 
+// lib/queue.ts - will use REDIS_URL from env
 export const emailQueue = new Queue("emailQueue", {
   connection: {
-    host: "127.0.0.1",
-    port: 6379,
+    url: process.env.REDIS_URL,
   },
 });
