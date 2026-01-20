@@ -1,7 +1,12 @@
 import axios from "axios";
 
+const baseURL =
+  typeof window !== "undefined"
+    ? window.location.origin
+    : process.env.NEXTAUTH_URL || "http://localhost:3000";
+
 const api = axios.create({
-  baseURL: "http://localhost:3000",
+  baseURL,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
